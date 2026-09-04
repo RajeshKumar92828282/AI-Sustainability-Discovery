@@ -1,0 +1,38 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.db.database import Base, engine
+from app.models.report import Report
+from app.api.routes.reports import router as reports_router
+
+
+Base.metadata.create_all(bind=engine)
+
+
+app = FastAPI(
+    title="AI Sustainability Discovery",
+    description="AI-powered sustainability problem discovery platform",
+    version="1.0.0"
+)
+
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+app.include_router(reports_router)
+
+
+@app.get("/")
+def root():
+    return {
+        "message": "AI Sustainability Discovery API is running",
+        "status": "online"
+    }
