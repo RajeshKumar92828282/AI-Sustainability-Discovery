@@ -7,7 +7,7 @@ from app.schemas.report import ReportCreate
 def create_report(
     db: Session,
     report_data: ReportCreate
-):
+) -> Report:
     report = Report(
         description=report_data.description,
         category=report_data.category,
@@ -22,7 +22,7 @@ def create_report(
     return report
 
 
-def get_reports(db: Session):
+def get_all_reports(db: Session):
     return (
         db.query(Report)
         .order_by(Report.created_at.desc())
@@ -30,7 +30,7 @@ def get_reports(db: Session):
     )
 
 
-def get_report(
+def get_report_by_id(
     db: Session,
     report_id: int
 ):
