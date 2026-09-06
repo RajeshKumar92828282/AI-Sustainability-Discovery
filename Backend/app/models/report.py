@@ -16,6 +16,8 @@ class Report(Base):
 
     location = Column(String(255), nullable=True)
 
+    photo_path = Column(String(500), nullable=True)
+
     status = Column(
         String(50),
         nullable=False,

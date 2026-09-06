@@ -1,18 +1,22 @@
 from sqlalchemy.orm import Session
 
 from app.models.report import Report
-from app.schemas.report import ReportCreate
 
 
 def create_report(
     db: Session,
-    report_data: ReportCreate
+    description: str,
+    category: str,
+    location: str | None = None,
+    photo_path: str | None = None,
 ) -> Report:
+
     report = Report(
-        description=report_data.description,
-        category=report_data.category,
-        location=report_data.location,
-        status="submitted"
+        description=description,
+        category=category,
+        location=location,
+        photo_path=photo_path,
+        status="submitted",
     )
 
     db.add(report)
@@ -32,7 +36,7 @@ def get_all_reports(db: Session):
 
 def get_report_by_id(
     db: Session,
-    report_id: int
+    report_id: int,
 ):
     return (
         db.query(Report)
