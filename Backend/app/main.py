@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
+from fastapi.staticfiles import StaticFiles
 from app.db.database import Base, engine
 from app.models.report import Report
 from app.api.routes.reports import router as reports_router
@@ -16,7 +16,11 @@ app = FastAPI(
     version="1.0.0",
 )
 
-
+app.mount(
+    "/uploads",
+    StaticFiles(directory="uploads"),
+    name="uploads",
+)
 # Allow Next.js frontend
 app.add_middleware(
     CORSMiddleware,
