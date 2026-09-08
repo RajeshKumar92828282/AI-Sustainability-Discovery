@@ -10,7 +10,6 @@ def create_report(
     location: str | None = None,
     photo_path: str | None = None,
 ) -> Report:
-
     report = Report(
         description=description,
         category=category,
@@ -26,7 +25,7 @@ def create_report(
     return report
 
 
-def get_all_reports(db: Session):
+def get_reports(db: Session):
     return (
         db.query(Report)
         .order_by(Report.created_at.desc())
@@ -34,10 +33,7 @@ def get_all_reports(db: Session):
     )
 
 
-def get_report_by_id(
-    db: Session,
-    report_id: int,
-):
+def get_report(db: Session, report_id: int):
     return (
         db.query(Report)
         .filter(Report.id == report_id)
