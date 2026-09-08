@@ -1,6 +1,11 @@
 from datetime import datetime
-
 from pydantic import BaseModel, ConfigDict
+
+
+class ReportCreate(BaseModel):
+    description: str
+    category: str
+    location: str | None = None
 
 
 class ReportResponse(BaseModel):
