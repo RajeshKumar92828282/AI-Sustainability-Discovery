@@ -1,15 +1,22 @@
 import os
 import uuid
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+)
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
 from app.schemas.report import ReportResponse
 from app.services.report_service import (
     create_report,
-    get_all_reports,
-    get_report_by_id,
+    get_reports,
+    get_report,
 )
 
 router = APIRouter(
@@ -18,7 +25,6 @@ router = APIRouter(
 )
 
 UPLOAD_DIR = "uploads/reports"
-
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
@@ -34,9 +40,21 @@ async def submit_report(
     photo: UploadFile | None = File(None),
     db: Session = Depends(get_db),
 ):
+    if not description.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Description cannot be empty.",
+        )
+
+    if not category.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Category cannot be empty.",
+        )
+
     photo_path = None
 
-    if photo:
+    if photo is not None:
         allowed_types = {
             "image/jpeg",
             "image/png",
@@ -56,10 +74,11 @@ async def submit_report(
                 detail="Image must be smaller than 5 MB.",
             )
 
-        extension = ".jpg"
-
-        if photo.content_type == "image/png":
-            extension = ".png"
+        extension = (
+            ".png"
+            if photo.content_type == "image/png"
+            else ".jpg"
+        )
 
         filename = f"{uuid.uuid4()}{extension}"
 
@@ -73,9 +92,9 @@ async def submit_report(
 
     return create_report(
         db=db,
-        description=description,
-        category=category,
-        location=location,
+        description=description.strip(),
+        category=category.strip(),
+        location=location.strip() if location else None,
         photo_path=photo_path,
     )
 
@@ -87,7 +106,7 @@ async def submit_report(
 def list_reports(
     db: Session = Depends(get_db),
 ):
-    return get_all_reports(db)
+    return get_reports(db)
 
 
 @router.get(
@@ -98,7 +117,7 @@ def read_report(
     report_id: int,
     db: Session = Depends(get_db),
 ):
-    report = get_report_by_id(db, report_id)
+    report = get_report(db, report_id)
 
     if report is None:
         raise HTTPException(
