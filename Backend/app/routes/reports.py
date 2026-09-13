@@ -55,12 +55,13 @@ async def submit_report(
     photo_path = None
 
     if photo is not None:
-        allowed_types = {
-            "image/jpeg",
-            "image/png",
-        }
+        content_type = (photo.content_type or "").lower()
+        filename_lower = (photo.filename or "").lower()
 
-        if photo.content_type not in allowed_types:
+        is_jpg = content_type in ("image/jpeg", "image/jpg") or filename_lower.endswith((".jpg", ".jpeg"))
+        is_png = content_type == "image/png" or filename_lower.endswith(".png")
+
+        if not (is_jpg or is_png):
             raise HTTPException(
                 status_code=400,
                 detail="Only JPG and PNG images are allowed.",
@@ -74,18 +75,9 @@ async def submit_report(
                 detail="Image must be smaller than 5 MB.",
             )
 
-        extension = (
-            ".png"
-            if photo.content_type == "image/png"
-            else ".jpg"
-        )
-
+        extension = ".png" if is_png else ".jpg"
         filename = f"{uuid.uuid4()}{extension}"
-
-        photo_path = os.path.join(
-            UPLOAD_DIR,
-            filename,
-        )
+        photo_path = f"{UPLOAD_DIR}/{filename}"
 
         with open(photo_path, "wb") as file:
             file.write(contents)
