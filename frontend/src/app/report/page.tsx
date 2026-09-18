@@ -12,6 +12,9 @@ import {
   Image as ImageIcon,
   ChevronRight,
   AlertCircle,
+  CheckCircle2,
+  Activity,
+  Filter,
 } from "lucide-react";
 
 const API_URL =
@@ -25,7 +28,35 @@ type Report = {
   photo_path: string | null;
   status: string;
   created_at: string;
+  updated_at: string;
 };
+
+const STATUS_LABELS: Record<string, string> = {
+  submitted: "Submitted",
+  under_review: "Under Review",
+  action_planned: "Action Planned",
+  in_progress: "In Progress",
+  resolved: "Resolved",
+  verified: "Verified",
+};
+
+const STATUS_BADGE: Record<string, string> = {
+  submitted: "text-slate-400 border-slate-500/30 bg-slate-500/10",
+  under_review: "text-blue-400 border-blue-500/30 bg-blue-500/10",
+  action_planned: "text-amber-400 border-amber-500/30 bg-amber-500/10",
+  in_progress: "text-orange-400 border-orange-500/30 bg-orange-500/10",
+  resolved: "text-emerald-400 border-emerald-500/30 bg-emerald-500/10",
+  verified: "text-teal-400 border-teal-500/30 bg-teal-500/10",
+};
+
+const ALL_STATUSES = [
+  "submitted",
+  "under_review",
+  "action_planned",
+  "in_progress",
+  "resolved",
+  "verified",
+];
 
 export default function ReportsPage() {
   const router = useRouter();
@@ -33,6 +64,7 @@ export default function ReportsPage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
 
   async function fetchReports() {
     try {
@@ -57,11 +89,8 @@ export default function ReportsPage() {
       setReports(data);
     } catch (err) {
       console.error("Failed to fetch reports:", err);
-
       setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to connect to the backend."
+        err instanceof Error ? err.message : "Unable to connect to the backend."
       );
     } finally {
       setLoading(false);
@@ -72,17 +101,13 @@ export default function ReportsPage() {
     fetchReports();
   }, []);
 
-  const submittedCount = reports.filter(
-    (report) => report.status === "submitted"
-  ).length;
-
-  const evidenceCount = reports.filter(
-    (report) => Boolean(report.photo_path)
-  ).length;
-
   function formatDate(dateString: string) {
     try {
-      return new Date(dateString).toLocaleString();
+      return new Date(dateString).toLocaleDateString(undefined, {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
     } catch {
       return dateString;
     }
@@ -90,11 +115,24 @@ export default function ReportsPage() {
 
   function getPhotoUrl(photoPath: string | null) {
     if (!photoPath) return null;
-
     const cleanPath = photoPath.replace(/\\/g, "/").replace(/^\/+/, "");
     const cleanApiUrl = API_URL.replace(/\/+$/, "");
     return `${cleanApiUrl}/${cleanPath}`;
   }
+
+  // Stats
+  const statusCounts = ALL_STATUSES.reduce(
+    (acc, s) => {
+      acc[s] = reports.filter((r) => r.status === s).length;
+      return acc;
+    },
+    {} as Record<string, number>
+  );
+
+  const filteredReports =
+    statusFilter === "all"
+      ? reports
+      : reports.filter((r) => r.status === statusFilter);
 
   return (
     <main className="min-h-screen bg-black text-white">
@@ -131,9 +169,8 @@ export default function ReportsPage() {
             </h1>
 
             <p className="mt-3 max-w-2xl text-base text-white/50">
-              Explore sustainability problems submitted by users.
-              Identify recurring issues and turn observations into
-              actionable insights.
+              Sustainability issues reported by the community. Each report is
+              analyzed by AI and tracked through to resolution.
             </p>
           </div>
 
@@ -161,34 +198,82 @@ export default function ReportsPage() {
         </div>
 
         {/* Stats */}
-        <div className="mt-10 grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-6">
+        <div className="mt-10 grid gap-3 grid-cols-3 sm:grid-cols-6">
+          {ALL_STATUSES.map((s) => (
+            <button
+              key={s}
+              onClick={() =>
+                setStatusFilter(statusFilter === s ? "all" : s)
+              }
+              className={`rounded-xl border p-4 text-left transition ${
+                statusFilter === s
+                  ? "border-emerald-400/40 bg-emerald-400/10"
+                  : "border-white/10 bg-white/[0.025] hover:border-white/20"
+              }`}
+            >
+              <p className="text-xs text-white/40 truncate">
+                {STATUS_LABELS[s]}
+              </p>
+              <p
+                className={`mt-1.5 text-2xl font-semibold ${
+                  statusFilter === s ? "text-emerald-400" : "text-white"
+                }`}
+              >
+                {loading ? "—" : statusCounts[s] || 0}
+              </p>
+            </button>
+          ))}
+        </div>
+
+        {/* Active filter indicator */}
+        {statusFilter !== "all" && (
+          <div className="mt-4 flex items-center gap-2">
+            <Filter size={14} className="text-emerald-400" />
+            <span className="text-sm text-emerald-400">
+              Showing: {STATUS_LABELS[statusFilter]}
+            </span>
+            <button
+              onClick={() => setStatusFilter("all")}
+              className="ml-2 text-xs text-white/40 underline hover:text-white"
+            >
+              Clear filter
+            </button>
+          </div>
+        )}
+
+        {/* Summary stats row */}
+        <div className="mt-6 grid gap-4 md:grid-cols-3">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-5">
             <p className="text-xs font-medium uppercase tracking-wider text-white/40">
               Total Reports
             </p>
-
-            <p className="mt-3 text-4xl font-semibold">
+            <p className="mt-2 text-3xl font-semibold">
               {loading ? "—" : reports.length}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-6">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-5">
             <p className="text-xs font-medium uppercase tracking-wider text-white/40">
-              Submitted
+              Active (Under Review / In Progress)
             </p>
-
-            <p className="mt-3 text-4xl font-semibold text-emerald-400">
-              {loading ? "—" : submittedCount}
+            <p className="mt-2 text-3xl font-semibold text-blue-400">
+              {loading
+                ? "—"
+                : (statusCounts.under_review || 0) +
+                  (statusCounts.action_planned || 0) +
+                  (statusCounts.in_progress || 0)}
             </p>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-6">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-5">
             <p className="text-xs font-medium uppercase tracking-wider text-white/40">
-              With Evidence
+              Resolved & Verified
             </p>
-
-            <p className="mt-3 text-4xl font-semibold">
-              {loading ? "—" : evidenceCount}
+            <p className="mt-2 text-3xl font-semibold text-emerald-400">
+              {loading
+                ? "—"
+                : (statusCounts.resolved || 0) +
+                  (statusCounts.verified || 0)}
             </p>
           </div>
         </div>
@@ -200,16 +285,11 @@ export default function ReportsPage() {
               size={20}
               className="mt-0.5 shrink-0 text-red-400"
             />
-
             <div>
               <p className="font-medium text-red-300">
                 Unable to load reports
               </p>
-
-              <p className="mt-1 text-sm text-red-300/60">
-                {error}
-              </p>
-
+              <p className="mt-1 text-sm text-red-300/60">{error}</p>
               <button
                 onClick={fetchReports}
                 className="mt-3 text-sm font-medium text-red-300 underline underline-offset-4"
@@ -238,46 +318,53 @@ export default function ReportsPage() {
         )}
 
         {/* Empty state */}
-        {!loading && !error && reports.length === 0 && (
+        {!loading && !error && filteredReports.length === 0 && (
           <div className="mt-8 rounded-2xl border border-dashed border-white/10 bg-white/[0.015] px-6 py-20 text-center">
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03]">
-              <FileText
-                size={30}
-                className="text-white/30"
-              />
+              <FileText size={30} className="text-white/30" />
             </div>
 
             <h2 className="mt-6 text-xl font-semibold">
-              No reports yet
+              {statusFilter === "all"
+                ? "No reports yet"
+                : `No ${STATUS_LABELS[statusFilter]} reports`}
             </h2>
 
             <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/40">
-              Be the first person to report a sustainability
-              problem and help create useful real-world data.
+              {statusFilter === "all"
+                ? "Be the first person to report a sustainability problem and help create useful real-world data."
+                : "No reports currently have this status. Try a different filter."}
             </p>
 
-            <button
-              onClick={() => router.push("/report/new")}
-              className="mt-7 inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-black transition hover:bg-white/90"
-            >
-              <Plus size={17} />
-              Submit First Report
-            </button>
+            {statusFilter === "all" ? (
+              <button
+                onClick={() => router.push("/report/new")}
+                className="mt-7 inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-black transition hover:bg-white/90"
+              >
+                <Plus size={17} />
+                Submit First Report
+              </button>
+            ) : (
+              <button
+                onClick={() => setStatusFilter("all")}
+                className="mt-7 inline-flex items-center gap-2 rounded-xl border border-white/10 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/5"
+              >
+                Clear Filter
+              </button>
+            )}
           </div>
         )}
 
-        {/* Reports */}
-        {!loading && !error && reports.length > 0 && (
+        {/* Reports List */}
+        {!loading && !error && filteredReports.length > 0 && (
           <div className="mt-8 space-y-4">
-            {reports.map((report) => {
+            {filteredReports.map((report) => {
               const photoUrl = getPhotoUrl(report.photo_path);
 
               return (
                 <button
                   key={report.id}
-                  onClick={() =>
-                    router.push(`/report/${report.id}`)
-                  }
+                  onClick={() => router.push(`/report/${report.id}`)}
                   className="group w-full rounded-2xl border border-white/10 bg-white/[0.025] p-6 text-left transition hover:border-emerald-400/20 hover:bg-white/[0.04]"
                 >
                   <div className="flex flex-col gap-6 md:flex-row">
@@ -303,8 +390,13 @@ export default function ReportsPage() {
                           #{report.id}
                         </span>
 
-                        <span className="rounded-full border border-white/10 px-2.5 py-1 text-xs capitalize text-white/40">
-                          {report.status}
+                        <span
+                          className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
+                            STATUS_BADGE[report.status] ||
+                            "border-white/10 text-white/40"
+                          }`}
+                        >
+                          {STATUS_LABELS[report.status] || report.status}
                         </span>
                       </div>
 
@@ -326,9 +418,24 @@ export default function ReportsPage() {
                         </span>
 
                         {report.photo_path && (
-                          <span className="flex items-center gap-1.5">
+                          <span className="flex items-center gap-1.5 text-emerald-400/70">
                             <ImageIcon size={14} />
                             Evidence attached
+                          </span>
+                        )}
+
+                        {report.status === "resolved" ||
+                        report.status === "verified" ? (
+                          <span className="flex items-center gap-1.5 text-emerald-400">
+                            <CheckCircle2 size={14} />
+                            {report.status === "verified"
+                              ? "Verified"
+                              : "Resolved"}
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1.5 text-blue-400/70">
+                            <Activity size={14} />
+                            Active
                           </span>
                         )}
                       </div>
@@ -353,7 +460,7 @@ export default function ReportsPage() {
       <footer className="mt-20 border-t border-white/10">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6 text-xs text-white/30">
           <span>AI Sustainability Discovery Platform</span>
-          <span>Responsible AI • Sustainability • Data-driven Impact</span>
+          <span>Responsible AI · SDG 11 · Data-driven Impact</span>
         </div>
       </footer>
     </main>
