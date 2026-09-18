@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import Column, DateTime, Integer, String, Text
+from sqlalchemy.orm import relationship
 
 from app.db.database import Base
 
@@ -27,5 +28,27 @@ class Report(Base):
     created_at = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow
+        default=datetime.utcnow,
     )
+
+    updated_at = Column(
+        DateTime,
+        nullable=True,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
+
+    # Relationships
+    status_history = relationship(
+        "ReportStatusHistory",
+        back_populates="report",
+        order_by="ReportStatusHistory.changed_at",
+        cascade="all, delete-orphan",
+    )
+
+    analysis = relationship(
+        "ReportAnalysis",
+        back_populates="report",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )
