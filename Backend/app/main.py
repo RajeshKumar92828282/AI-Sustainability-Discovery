@@ -1,19 +1,38 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+
 from app.db.database import Base, engine
-from app.models.report import Report
+
+# Import ALL models to ensure tables are created
+import app.models  # noqa: F401 — side-effect: registers Report, ReportStatusHistory, ReportAnalysis
+
 from app.api.routes.reports import router as reports_router
 
 
-# Create database tables
+# Create all database tables
 Base.metadata.create_all(bind=engine)
+
+def _ensure_schema_migrations():
+    try:
+        from sqlalchemy import inspect, text
+        inspector = inspect(engine)
+        if "report_analysis" in inspector.get_table_names():
+            columns = [c["name"] for c in inspector.get_columns("report_analysis")]
+            if "retrieved_sources" not in columns:
+                with engine.connect() as conn:
+                    conn.execute(text("ALTER TABLE report_analysis ADD COLUMN retrieved_sources TEXT;"))
+                    conn.commit()
+    except Exception as e:
+        print("Migration notice:", e)
+
+_ensure_schema_migrations()
 
 
 app = FastAPI(
     title="AI Sustainability Discovery API",
-    description="AI-powered sustainability problem discovery platform",
-    version="1.0.0",
+    description="AI-powered sustainability problem reporting and action platform",
+    version="2.0.0",
 )
 
 app.mount(
@@ -21,17 +40,18 @@ app.mount(
     StaticFiles(directory="uploads"),
     name="uploads",
 )
+
 # Allow Next.js frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
+        "http://127.0.0.1:3000",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 # Register API routes
 app.include_router(reports_router)
@@ -42,4 +62,5 @@ def root():
     return {
         "message": "AI Sustainability Discovery API is running",
         "status": "online",
+        "version": "2.0.0",
     }
