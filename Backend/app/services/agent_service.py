@@ -32,6 +32,7 @@ from app.services.ai_service import (
     AnalysisResult,
     _parse_model_response,
     _simulated_analysis,
+    _priority_level,
 )
 
 logger = logging.getLogger(__name__)
@@ -446,6 +447,9 @@ def _agent_call_gemini(prompt: str, api_key: str, category: str) -> Optional[Ana
                     text = parts[0].get("text", "")
                     result = _parse_model_response(text, category)
                     result.model_name = "Google Gemini 1.5 Flash (Agentic RAG)"
+                    result.provider = "Google Gemini"
+                    result.is_live = True
+                    result.priority_level = _priority_level(result.priority_score)
                     return result
         else:
             logger.warning(f"Gemini agent call returned {response.status_code}: {response.text[:200]}")
@@ -485,6 +489,9 @@ def _agent_call_watsonx(
         response_text = model.generate_text(prompt=prompt)
         result = _parse_model_response(response_text, category)
         result.model_name = "IBM Granite 3 8B Instruct (Agentic watsonx.ai)"
+        result.provider = "IBM watsonx"
+        result.is_live = True
+        result.priority_level = _priority_level(result.priority_score)
         result.retrieved_sources = retrieved_sources
         return result
     except Exception as exc:
@@ -633,6 +640,9 @@ def run_sustainability_agent(
         analysis_result.model_name = (
             "AI Sustainability Agent (Deterministic Fallback — Live API not configured)"
         )
+        # Ensure provenance fields are set correctly for fallback
+        analysis_result.provider = "Structured Fallback"
+        analysis_result.is_live = False
 
     # Attach retrieved sources to result
     analysis_result.retrieved_sources = retrieved_sources

@@ -15,6 +15,45 @@ ALLOWED_STATUSES = [
     "verified",
 ]
 
+# Defines the only valid forward transitions in the report lifecycle.
+# verified has no valid next state — the report is closed unless explicitly reopened.
+VALID_TRANSITIONS: dict[str, list[str]] = {
+    "submitted":      ["under_review"],
+    "under_review":   ["action_planned"],
+    "action_planned": ["in_progress"],
+    "in_progress":    ["resolved"],
+    "resolved":       ["verified"],
+    "verified":       [],  # No further automatic transitions
+}
+
+
+def validate_status_transition(current_status: str, new_status: str) -> None:
+    """
+    Validate that a status transition follows the defined lifecycle order.
+
+    Raises:
+        ValueError: with a descriptive message if the transition is not allowed.
+    """
+    allowed_next = VALID_TRANSITIONS.get(current_status, [])
+    if new_status not in allowed_next:
+        if current_status == new_status:
+            raise ValueError(
+                f"Report is already in '{current_status}' status. No change needed."
+            )
+        if current_status == "verified":
+            raise ValueError(
+                "Report is 'verified' and closed. No further status transitions are permitted. "
+                "If reopening is required, please use a dedicated reopen action."
+            )
+        from_label = current_status.replace("_", " ").title()
+        to_label = new_status.replace("_", " ").title()
+        allowed_labels = [s.replace("_", " ").title() for s in allowed_next]
+        raise ValueError(
+            f"Invalid status transition: '{from_label}' \u2192 '{to_label}'. "
+            f"Allowed next status from '{from_label}': "
+            f"{allowed_labels if allowed_labels else 'None (report is closed)'}."
+        )
+
 
 def create_report(
     db: Session,
@@ -69,9 +108,21 @@ def update_report_status(
     new_status: str,
     note: Optional[str] = None,
 ) -> Report:
-    """Update the status of a report and record the change in history."""
+    """
+    Update the lifecycle status of a report with transition validation.
+
+    Validates that:
+    1. new_status is one of the 6 allowed statuses.
+    2. The transition from current_status → new_status follows the defined lifecycle order.
+
+    Raises:
+        ValueError: for unknown statuses or invalid lifecycle transitions (caller returns HTTP 400).
+    """
     if new_status not in ALLOWED_STATUSES:
-        raise ValueError(f"Invalid status: {new_status}")
+        raise ValueError(f"Unknown status '{new_status}'. Allowed values: {ALLOWED_STATUSES}")
+
+    # Enforce lifecycle ordering — e.g. verified → submitted is forbidden
+    validate_status_transition(report.status, new_status)
 
     old_status = report.status
 
@@ -81,7 +132,7 @@ def update_report_status(
     db.commit()
     db.refresh(report)
 
-    # Record history entry
+    # Record history entry only after a successful valid transition
     _record_status_history(
         db=db,
         report_id=report.id,
@@ -91,6 +142,7 @@ def update_report_status(
     )
 
     return report
+
 
 
 def get_report_status_history(db: Session, report_id: int):

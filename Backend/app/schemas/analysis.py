@@ -14,6 +14,9 @@ class ReportAnalysisResponse(BaseModel):
     recommended_action: Optional[str] = None
     impact_estimate: Optional[str] = None
     model_name: Optional[str] = None
+    # Provenance fields — expose live vs simulated to the frontend
+    provider: Optional[str] = None       # e.g. "Google Gemini", "Structured Fallback"
+    is_live: Optional[bool] = None       # True = real API call succeeded
     retrieved_sources: Optional[Any] = None
     # Agent fields — None when analysis was run via regular /analyze endpoint
     agent_selected_tools: Optional[Any] = None

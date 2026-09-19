@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from app.db.database import Base
@@ -27,6 +27,10 @@ class ReportAnalysis(Base):
     recommended_action = Column(Text, nullable=True)
     impact_estimate = Column(Text, nullable=True)
     retrieved_sources = Column(Text, nullable=True)
+
+    # Provenance — which AI provider generated this analysis
+    provider = Column(String(100), nullable=True)      # e.g. "Google Gemini", "Structured Fallback"
+    is_live = Column(Boolean, nullable=True)           # True = real API call succeeded
 
     # Agent fields (nullable — only populated by /agent-analyze endpoint)
     agent_selected_tools = Column(Text, nullable=True)  # JSON array of tool names

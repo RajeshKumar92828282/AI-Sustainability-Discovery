@@ -39,7 +39,23 @@ class AnalysisResult:
     recommended_action: str
     impact_estimate: str
     model_name: str
+    # Provenance fields — always set so frontend can distinguish live vs simulated
+    provider: str = "Structured Fallback"   # e.g. "Google Gemini", "IBM watsonx", "Structured Fallback"
+    is_live: bool = False                   # True only when a real AI API call succeeded
+    priority_level: str = "MEDIUM"          # LOW / MEDIUM / HIGH / CRITICAL
     retrieved_sources: List[Dict[str, Any]] = field(default_factory=list)
+
+
+def _priority_level(score: int) -> str:
+    """Convert 1–10 priority score to human-readable level label."""
+    if score >= 9:
+        return "CRITICAL"
+    elif score >= 7:
+        return "HIGH"
+    elif score >= 4:
+        return "MEDIUM"
+    else:
+        return "LOW"
 
 
 # ──────────────────────────────────────────────
@@ -148,11 +164,15 @@ def _parse_model_response(text: str, fallback_category: str) -> AnalysisResult:
     return AnalysisResult(
         category=str(data.get("category", fallback_category)),
         priority_score=priority,
+        priority_level=_priority_level(priority),
         confidence=confidence,
         root_cause=str(data.get("root_cause", "Unable to determine root cause.")),
         recommended_action=str(data.get("recommended_action", "Further investigation required.")),
         impact_estimate=str(data.get("impact_estimate", "Qualitative impact assessment required.")),
         model_name="AI Provider",
+        # provider/is_live are set by the calling provider function after parsing
+        provider="Structured Fallback",
+        is_live=False,
         retrieved_sources=[],
     )
 
@@ -192,10 +212,14 @@ def _analyze_with_gemini(
                     text = parts[0].get("text", "")
                     result = _parse_model_response(text, category)
                     result.model_name = "Google Gemini 1.5 Flash (RAG Grounded)"
+                    result.provider = "Google Gemini"
+                    result.is_live = True
+                    result.priority_level = _priority_level(result.priority_score)
                     result.retrieved_sources = retrieved_sources
+                    logger.info("Gemini API analysis succeeded — is_live=True, provider=Google Gemini")
                     return result
         else:
-            logger.warning(f"Gemini API returned status code {response.status_code}: {response.text}")
+            logger.warning(f"Gemini API returned status code {response.status_code}: {response.text[:300]}")
     except Exception as exc:
         logger.warning(f"Gemini API analysis failed: {exc}")
 
@@ -237,6 +261,9 @@ def _analyze_with_watsonx(
         response_text = model.generate_text(prompt=prompt)
         result = _parse_model_response(response_text, category)
         result.model_name = "IBM Granite 3 8B Instruct (watsonx.ai - RAG Grounded)"
+        result.provider = "IBM watsonx"
+        result.is_live = True
+        result.priority_level = _priority_level(result.priority_score)
         result.retrieved_sources = retrieved_sources
         return result
     except Exception as exc:
@@ -353,11 +380,14 @@ def _simulated_analysis(
     return AnalysisResult(
         category=category,
         priority_score=priority,
+        priority_level=_priority_level(priority),
         confidence=confidence,
         root_cause=rule["root_cause"],
         recommended_action=rec_action,
         impact_estimate=rule["impact_estimate"] + location_note,
         model_name="AI-Assisted Analysis (Simulated — Live AI provider not configured)",
+        provider="Structured Fallback",
+        is_live=False,
         retrieved_sources=retrieved_sources,
     )
 

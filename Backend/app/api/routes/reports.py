@@ -42,6 +42,65 @@ def get_stats(db: Session = Depends(get_db)):
 
 
 # ──────────────────────────────────────────────
+# Gemini Diagnostic (Task 2)
+# ──────────────────────────────────────────────
+
+@router.get("/gemini-status")
+def gemini_status():
+    """
+    Diagnostic endpoint: verifies Gemini API key is loaded and optionally tests connectivity.
+    Does NOT expose the actual key value.
+    """
+    import os
+    key = os.getenv("GEMINI_API_KEY", "").strip()
+    placeholder_values = {"your_gemini_api_key_here", "placeholder", ""}
+    configured = bool(key) and key not in placeholder_values
+
+    key_hint = f"{key[:6]}...{key[-4:]}" if configured and len(key) >= 10 else "not set"
+
+    if not configured:
+        return {
+            "gemini_configured": False,
+            "key_hint": key_hint,
+            "message": "GEMINI_API_KEY is not set or is a placeholder. Set it in Backend/.env.",
+        }
+
+    # Attempt a minimal live test (list models probe)
+    try:
+        import httpx
+        probe_url = (
+            f"https://generativelanguage.googleapis.com/v1beta/models"
+            f"?key={key}&pageSize=1"
+        )
+        resp = httpx.get(probe_url, timeout=10.0)
+        if resp.status_code == 200:
+            return {
+                "gemini_configured": True,
+                "key_hint": key_hint,
+                "gemini_request": "SUCCESS",
+                "message": "Gemini API key is valid and connectivity confirmed.",
+            }
+        else:
+            return {
+                "gemini_configured": True,
+                "key_hint": key_hint,
+                "gemini_request": "FAILED",
+                "status_code": resp.status_code,
+                "error_category": "API_ERROR",
+                "message": f"Key loaded but Gemini returned HTTP {resp.status_code}. Check key validity.",
+            }
+    except Exception as exc:
+        err_type = type(exc).__name__
+        return {
+            "gemini_configured": True,
+            "key_hint": key_hint,
+            "gemini_request": "FAILED",
+            "error_category": err_type,
+            "message": f"Key loaded but connectivity test failed: {err_type}.",
+        }
+
+
+# ──────────────────────────────────────────────
 # Create Report
 # ──────────────────────────────────────────────
 
@@ -140,7 +199,7 @@ def update_status(
             note=body.note,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise HTTPException(status_code=400, detail=str(exc))
     except Exception as exc:
         logger.error("Status update failed: %s", exc)
         raise HTTPException(status_code=500, detail="Failed to update report status.")
@@ -207,6 +266,8 @@ def run_analysis(report_id: int, db: Session = Depends(get_db)):
         recommended_action=result.recommended_action,
         impact_estimate=result.impact_estimate,
         model_name=result.model_name,
+        provider=result.provider,
+        is_live=result.is_live,
         retrieved_sources=json.dumps(result.retrieved_sources) if result.retrieved_sources else None,
     )
     db.add(analysis)
@@ -282,6 +343,8 @@ def run_agent_analysis(report_id: int, db: Session = Depends(get_db)):
         recommended_action=result.recommended_action,
         impact_estimate=result.impact_estimate,
         model_name=result.model_name,
+        provider=result.provider,
+        is_live=result.is_live,
         retrieved_sources=json.dumps(result.retrieved_sources) if result.retrieved_sources else None,
         # Agent-specific fields
         agent_selected_tools=json.dumps(agent_output["agent_selected_tools"]),

@@ -64,6 +64,20 @@ const STATUS_COLORS: Record<string, string> = {
   verified: "text-teal-400 border-teal-500/30 bg-teal-500/10",
 };
 
+// Valid next statuses for each lifecycle state — enforces forward-only transitions in UI
+const VALID_NEXT_STATUSES: Record<string, string[]> = {
+  submitted:      ["under_review"],
+  under_review:   ["action_planned"],
+  action_planned: ["in_progress"],
+  in_progress:    ["resolved"],
+  resolved:       ["verified"],
+  verified:       [],  // No further transitions
+};
+
+function getValidNextStatuses(currentStatus: string): string[] {
+  return VALID_NEXT_STATUSES[currentStatus] ?? [];
+}
+
 function formatDate(dateStr?: string | null) {
   if (!dateStr) return "N/A";
   try {
@@ -521,8 +535,9 @@ export default function AdminPage() {
                         <td className="py-4 px-4 text-right space-x-2">
                           <button
                             onClick={() => {
+                              const validNext = getValidNextStatuses(report.status);
                               setActiveReport(report);
-                              setNewStatus(report.status);
+                              setNewStatus(validNext.length > 0 ? validNext[0] : report.status);
                               setStatusNote("");
                               setUpdateMsg(null);
                             }}
@@ -568,22 +583,28 @@ export default function AdminPage() {
               <p className="text-[11px] text-white/40 mt-1">Current Status: <strong className="text-emerald-300">{STATUS_LABELS[activeReport.status] || activeReport.status}</strong></p>
             </div>
 
-            {/* Target Status Select */}
+            {/* Target Status Select — only valid next statuses shown (Task 7) */}
             <div>
               <label className="block text-xs font-medium text-white/60 mb-1.5 uppercase tracking-wider">
                 New Operational Status
               </label>
-              <select
-                value={newStatus}
-                onChange={(e) => setNewStatus(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-black px-4 py-2.5 text-xs text-white focus:border-emerald-400/50 focus:outline-none"
-              >
-                {Object.entries(STATUS_LABELS).map(([k, label]) => (
-                  <option key={k} value={k} className="bg-slate-900">
-                    {label}
-                  </option>
-                ))}
-              </select>
+              {getValidNextStatuses(activeReport.status).length > 0 ? (
+                <select
+                  value={newStatus}
+                  onChange={(e) => setNewStatus(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-black px-4 py-2.5 text-xs text-white focus:border-emerald-400/50 focus:outline-none"
+                >
+                  {getValidNextStatuses(activeReport.status).map((k) => (
+                    <option key={k} value={k} className="bg-slate-900">
+                      {STATUS_LABELS[k] || k}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="rounded-xl border border-teal-500/20 bg-teal-500/5 px-4 py-3 text-xs text-teal-300">
+                  ✓ This report is <strong>Verified</strong> and closed. No further status transitions are permitted.
+                </div>
+              )}
             </div>
 
             {/* Note Input */}
@@ -621,7 +642,7 @@ export default function AdminPage() {
               </button>
               <button
                 onClick={handleStatusUpdateSubmit}
-                disabled={updating || newStatus === activeReport.status}
+                disabled={updating || newStatus === activeReport.status || getValidNextStatuses(activeReport.status).length === 0}
                 className="rounded-xl bg-emerald-400 px-4 py-2 text-xs font-semibold text-black hover:bg-emerald-300 disabled:opacity-40 flex items-center gap-1.5"
               >
                 {updating ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}

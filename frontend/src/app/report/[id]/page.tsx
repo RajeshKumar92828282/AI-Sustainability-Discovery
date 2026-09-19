@@ -59,6 +59,9 @@ type Analysis = {
   recommended_action: string | null;
   impact_estimate: string | null;
   model_name: string | null;
+  // Provenance fields from backend (Task 3)
+  provider: string | null;      // e.g. "Google Gemini", "Structured Fallback"
+  is_live: boolean | null;      // true = real API call succeeded
   retrieved_sources?: RetrievedSource[] | string | null;
   created_at: string;
 };
@@ -926,12 +929,33 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
               </div>
 
 
-              {/* Model info */}
+              {/* Model info — shows live vs simulated provider (Task 1/3) */}
               {analysis.model_name && (
                 <div className="text-xs text-white/30 space-y-1">
-                  <p>Analysis by: <span className="text-white/50">{analysis.model_name}</span> · {formatDate(analysis.created_at)}</p>
-                  {analysis.model_name.includes("Simulated") && (
-                    <p className="text-amber-400/70 text-[11px]">Live AI provider is not configured.</p>
+                  <p>
+                    Analysis by:{" "}
+                    {analysis.is_live === true ? (
+                      <span className="text-emerald-400/80 font-medium">
+                        {analysis.provider || analysis.model_name} — Live AI Analysis
+                      </span>
+                    ) : analysis.is_live === false ? (
+                      <span className="text-amber-400/70">
+                        {analysis.provider || "AI-Assisted Analysis"} — Simulated Fallback
+                      </span>
+                    ) : (
+                      <span className="text-white/50">{analysis.model_name}</span>
+                    )}{" "}
+                    · {formatDate(analysis.created_at)}
+                  </p>
+                  {analysis.is_live === false && (
+                    <p className="text-amber-400/60 text-[11px]">
+                      Configure GEMINI_API_KEY in Backend/.env for live Gemini analysis.
+                    </p>
+                  )}
+                  {analysis.is_live === true && (
+                    <p className="text-emerald-400/50 text-[11px]">
+                      Gemini API request succeeded — this is live AI analysis.
+                    </p>
                   )}
                 </div>
               )}
