@@ -28,6 +28,11 @@ class ReportAnalysis(Base):
     impact_estimate = Column(Text, nullable=True)
     retrieved_sources = Column(Text, nullable=True)
 
+    # Agent fields (nullable — only populated by /agent-analyze endpoint)
+    agent_selected_tools = Column(Text, nullable=True)  # JSON array of tool names
+    agent_reasoning = Column(Text, nullable=True)        # Short safe reasoning summary
+    agent_tool_results = Column(Text, nullable=True)     # JSON array of tool outputs
+
     # Metadata
     model_name = Column(String(200), nullable=True)
     created_at = Column(
@@ -38,3 +43,4 @@ class ReportAnalysis(Base):
 
     # Relationship
     report = relationship("Report", back_populates="analysis")
+

@@ -3,46 +3,52 @@
 > **1M1B AI for Sustainability Virtual Internship Project**  
 > *In collaboration with IBM SkillsBuild & AICTE*  
 > **Submission Deadline:** 21 September 2026  
-> **SDG Alignment:** Goal 11 (Sustainable Cities and Communities), Goal 12 (Responsible Consumption and Production), Goal 13 (Climate Action)
+> **SDG Alignment:** Goal 11 (Sustainable Cities and Communities), Goal 6 (Clean Water and Sanitation), Goal 7 (Affordable & Clean Energy), Goal 12 (Responsible Consumption & Production), Goal 13 (Climate Action)
 
 ---
 
 ## 📌 Project Overview
 
-**AI Sustainability Discovery** is an end-to-end AI-powered platform designed to crowdsource, analyze, prioritize, and track real-world sustainability issues across local communities using **Retrieval-Augmented Generation (RAG)**.
+**AI Sustainability Discovery** is an end-to-end AI-powered platform designed to crowdsource, analyze, prioritize, and track real-world sustainability issues across local communities using **Retrieval-Augmented Generation (RAG)** and an **Autonomous ReAct AI Agent**.
 
 The platform follows a 5-step operational workflow:
-$$\text{Discover} \longrightarrow \text{Retrieve Knowledge (RAG)} \longrightarrow \text{Grounded AI Analysis} \longrightarrow \text{Human Action} \longrightarrow \text{Measure Impact}$$
+$$\text{Discover} \longrightarrow \text{Understand (RAG \& Agent)} \longrightarrow \text{Prioritize} \longrightarrow \text{Act (Human Review)} \longrightarrow \text{Measure Impact}$$
 
 ---
 
 ## ✨ Key Features
 
 1. **Community Issue Reporting (`Discover`)**
-   - Photo evidence uploading with validation (JPG/PNG < 5MB)
-   - Multi-category classification (Waste Management, Water Conservation, Energy Efficiency, Food Sustainability, Urban Transport, Air Quality)
-   - Precise geotagging and location details
+   - Public issue submission form with description, category, location, and optional photo evidence validation (JPG/PNG < 5MB).
+   - Multi-category classification (Waste Management, Water Conservation, Energy Efficiency, Food Sustainability, Urban Transport, Air Quality).
 
 2. **RAG Vector Knowledge Engine (`Retrieve Knowledge`)**
-   - Local vector similarity search using `sentence-transformers` (`all-MiniLM-L6-v2`) and FAISS (with TF-IDF cosine fallback)
-   - 8 curated sustainability knowledge base documents (`Backend/data/knowledge/`) covering SDG 11, waste, water, energy, air quality, and responsible AI
+   - Vector similarity search using `sentence-transformers` (`all-MiniLM-L6-v2`) and FAISS index (`IndexFlatIP`).
+   - 9 curated sustainability knowledge base documents (`Backend/data/knowledge/`), including real **Campus Sustainability Survey evidence** ([`campus-survey.md`](file:///E:/AI-SUSTAINABILITY-DISCOVERY/Backend/data/knowledge/campus-survey.md)).
+   - Transparent attribution with relevance percentage, section title, and evidence excerpts.
 
-3. **Grounded AI Diagnostics (`Understand` & `Prioritize`)**
-   - Grounded prompt engineering combining user reports with retrieved knowledge base context
-   - Powered by Google Gemini API (`GEMINI_API_KEY`) or structured local RAG simulation fallback
-   - Priority scoring (1–10), confidence rating, root cause, recommended action, and qualitative impact
-   - **Knowledge Used UI**: Transparent source file attribution, match percentage, and retrieved excerpts
+3. **Autonomous ReAct AI Agent (`Understand` & `Prioritize`)**
+   - Controlled tool-selection ReAct agent ([`agent_service.py`](file:///E:/AI-SUSTAINABILITY-DISCOVERY/Backend/app/services/agent_service.py)) with 4 specialized read-only tools:
+     - `get_report`: Retrieves report details and location.
+     - `retrieve_knowledge`: Queries RAG vector index.
+     - `get_report_history`: Reviews report lifecycle status transitions.
+     - `get_dashboard_stats`: Checks campus-wide community statistics.
+   - Structured JSON analysis: Priority Score (1–10), Confidence Rating (0–100%), Probable Root Cause, Action Recommendation, Qualitative Impact Estimate.
+   - Live AI Provider Support (Google Gemini / IBM watsonx) with honest local fallback when credentials are not configured.
 
-4. **Lifecycle Tracking & Human Review (`Act`)**
-   - 6-Stage Status Lifecycle: `Submitted` $\rightarrow$ `Under Review` $\rightarrow$ `Action Planned` $\rightarrow$ `In Progress` $\rightarrow$ `Resolved` $\rightarrow$ `Verified`
-   - Complete Status Audit Log with timestamps and notes
+4. **Admin & Reviewer Panel (`Act`)**
+   - Admin registry dashboard ([`/admin`](http://localhost:3000/admin)) with real-time statistics, category distribution, search, status, and priority filters.
+   - Manual status management with optional action notes (e.g. *"Sanitation team notified for inspection"*).
+   - 6-Stage Status Lifecycle: `Submitted` $\rightarrow$ `Under Review` $\rightarrow$ `Action Planned` $\rightarrow$ `In Progress` $\rightarrow$ `Resolved` $\rightarrow$ `Verified`.
 
 5. **Analytics & Impact Dashboard (`Measure Impact`)**
-   - Real-time data visualisations built with Recharts
-   - Reports by status distribution and category breakdown from real DB data
+   - Real-time data visualisations built with Recharts at [`/dashboard`](http://localhost:3000/dashboard).
+   - Reports by status distribution and category breakdown from database metrics.
 
 6. **Responsible AI Framework**
-   - Built-in transparency badge, RAG source attribution, low-confidence warnings, and human oversight controls
+   - Human-in-the-loop guarantee: AI never automatically marks reports as `Resolved` or `Verified`.
+   - Campus survey observations explicitly labelled as *respondent-reported evidence*, not verified operational facts.
+   - Qualitative impact labelling without fabricated environmental savings.
 
 ---
 
@@ -51,11 +57,12 @@ $$\text{Discover} \longrightarrow \text{Retrieve Knowledge (RAG)} \longrightarro
 - **Frontend:** Next.js 16 (React 19, TypeScript, Lucide Icons, Recharts, Tailwind CSS)
 - **Backend:** Python FastAPI, SQLite, SQLAlchemy ORM, Pydantic v2
 - **RAG Engine:** `sentence-transformers`, `faiss-cpu`, `scikit-learn`
-- **AI Engine:** Google Gemini API (`GEMINI_API_KEY`) with structured RAG simulation fallback
+- **Agentic AI:** Autonomous ReAct loop with controlled tool execution (`agent_service.py`)
+- **AI Providers:** Google Gemini API (`GEMINI_API_KEY`) / IBM watsonx with deterministic fallback
 
 ---
 
-## 🚀 Quick Start & How to Work This Project
+## 🚀 Quick Start & Local Setup
 
 ### Prerequisites
 - Node.js (v18+)
@@ -71,12 +78,7 @@ cd Backend
 # 1. Install dependencies
 pip install -r requirements.txt
 
-# 2. (Optional) Configure Gemini API Key in .env
-# Copy template and add your API key if available
-copy .env.example .env
-# Edit Backend/.env: GEMINI_API_KEY=your_actual_api_key_here
-
-# 3. Start FastAPI Server
+# 2. Start FastAPI Server
 uvicorn app.main:app --reload
 ```
 
@@ -85,14 +87,14 @@ uvicorn app.main:app --reload
 
 ---
 
-### Step 2: Run Automated Tests
+### Step 2: Run Automated Test Suite
 
 In a separate terminal window:
 ```bash
 cd Backend
-python -m pytest
+python -m pytest tests/ -v
 ```
-Runs 6 automated unit & end-to-end tests verifying vector retrieval and API analysis.
+Runs 20 automated pytest tests verifying RAG vector retrieval, campus survey retrieval, agent tool selection, status non-mutation, and API endpoints.
 
 ---
 
@@ -102,36 +104,26 @@ In another terminal window:
 ```bash
 cd frontend
 
-# 1. Install dependencies
-npm install
+# 1. Build frontend (verifies TypeScript & routes)
+npm run build
 
 # 2. Start Next.js Development Server
 npm run dev
 ```
 
-- Access the Application in your browser: `http://localhost:3000`
+- Access Application: `http://localhost:3000`
+- Access Admin Panel: `http://localhost:3000/admin`
+- Access Impact Dashboard: `http://localhost:3000/dashboard`
 
 ---
 
-## 💻 Step-by-Step User Workflow
+## 💻 Step-by-Step Demo Workflow
 
-1. **Open Application**: Go to `http://localhost:3000` in your web browser.
-2. **Report an Issue**:
-   - Click **Report an Issue** on the navigation bar.
-   - Enter description (e.g. *"Overflowing waste bins near the college entrance"*).
-   - Select Category (e.g. `Waste`), Location (`College Entrance`), and upload a photo.
-   - Click **Submit Sustainability Report**.
-3. **Run RAG AI Analysis**:
-   - On the Report Detail page, click **Run AI Analysis**.
-   - The backend runs local vector retrieval against `Backend/data/knowledge/`, retrieves relevant chunks (`waste-management.md`, `sdg11.md`), and generates grounded analysis.
-   - View the **AI-Assisted Priority**, **Confidence %**, **Probable Root Cause**, and **Recommended Action**.
-   - Inspect the **Knowledge Used** section to see retrieved document names, match percentages, and excerpts.
-   - Read the **What is RAG?** explanation card.
-4. **Track Lifecycle & Human Review**:
-   - Select a new status from the **Update Status** dropdown (e.g. `Under Review` $\rightarrow$ `Action Planned` $\rightarrow$ `Resolved`).
-   - Click **Update Status** to log an entry in the chronological **Status History**.
-5. **View Impact Dashboard**:
-   - Click **Impact Dashboard** in navigation to view real-time charts and metrics.
+1. **Submit Issue**: Open `http://localhost:3000/report/new` and submit a report (e.g., *"Overflowing waste bins near the college entrance"*).
+2. **Run AI Agent**: Open report detail page and click **Run AI Agent Analysis**. Observe tool execution, RAG evidence retrieval, and priority score.
+3. **Inspect RAG Knowledge**: Review the **Knowledge Used** section displaying `campus-survey.md` and `waste-management.md` excerpts with relevance percentages.
+4. **Admin Review**: Open `http://localhost:3000/admin`. Search and filter reports. Advance report status from `Submitted` $\rightarrow$ `Under Review` $\rightarrow$ `Action Planned` $\rightarrow$ `In Progress` $\rightarrow$ `Resolved` $\rightarrow$ `Verified` with custom inspector notes.
+5. **Impact Dashboard**: Open `http://localhost:3000/dashboard` to verify real-time status and category distribution metrics.
 
 ---
 

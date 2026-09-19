@@ -19,12 +19,18 @@ def _ensure_schema_migrations():
         inspector = inspect(engine)
         if "report_analysis" in inspector.get_table_names():
             columns = [c["name"] for c in inspector.get_columns("report_analysis")]
-            if "retrieved_sources" not in columns:
-                with engine.connect() as conn:
+            with engine.connect() as conn:
+                # Original RAG column
+                if "retrieved_sources" not in columns:
                     conn.execute(text("ALTER TABLE report_analysis ADD COLUMN retrieved_sources TEXT;"))
-                    conn.commit()
+                # Agent columns
+                for agent_col in ("agent_selected_tools", "agent_reasoning", "agent_tool_results"):
+                    if agent_col not in columns:
+                        conn.execute(text(f"ALTER TABLE report_analysis ADD COLUMN {agent_col} TEXT;"))
+                conn.commit()
     except Exception as e:
         print("Migration notice:", e)
+
 
 _ensure_schema_migrations()
 

@@ -1,110 +1,94 @@
 # Demo Script — AI Sustainability Discovery
-## 2–3 Minute Demo for 1M1B Submission
+## 3-Minute Live Submission & Review Demo
 
 ---
 
-### 0:00 — The Problem (0:00–0:20)
+### 0:00 — Problem & Workflow Overview (0:00–0:25)
 
-**[Show home page]**
+**[Show home page at http://localhost:3000]**
 
-"Every day, students and community members notice sustainability problems around them — overflowing waste bins, water leaks, poor air quality, energy being wasted. But most of these observations go unreported, get lost in group chats, or never reach the people who can fix them.
+"Every day, students and community members observe sustainability problems around them — overflowing waste bins, water leaks, unmanaged energy waste. But most observations go unreported or get lost in informal communication channels.
 
-Without structured data and documented knowledge, there's no priority, no accountability, and no way to measure whether anything actually improved.
+Without structured data, there is no priority, no accountability, and no way to measure impact.
 
-AI Sustainability Discovery changes that."
-
----
-
-### 0:20 — The Solution & RAG Architecture (0:20–0:40)
-
-**[Point to workflow on home page: Discover → RAG Knowledge Retrieval → Grounded AI Analysis → Human Action → Measure Impact]**
-
-"Our platform implements Retrieval-Augmented Generation (RAG).
-
-When a community member reports a problem, the system first retrieves relevant sustainability knowledge from our 8 project knowledge documents — covering waste management, energy, water, air quality, SDG 11, and responsible AI.
-
-This knowledge grounds the AI analysis in documented solutions rather than relying on unverified general model knowledge."
+AI Sustainability Discovery solves this through a 5-step operational workflow:
+**Discover → Understand → Prioritize → Act → Measure Impact**"
 
 ---
 
-### 0:40 — Submitting a Report (0:40–1:00)
+### 0:25 — Submitting a Public Sustainability Issue (0:25–0:50)
 
-**[Navigate to: Report a Sustainability Issue → New Report form]**
+**[Click: Report an Issue on nav bar]**
 
-"Let me show you a real submission. I'm going to report a waste management issue — overflowing bins near the campus entrance."
+"Community users can submit issues via a clean form with description, category, location, and optional photo evidence. No public survey upload is permitted — public input remains focused on real-world issue reporting."
 
-**[Type description: 'Overflowing waste bins near the college entrance are causing unmanaged waste accumulation.', select category: Waste, enter location: College Entrance]**
-
-**[Upload photo]**
-
+**[Enter Description: "Overflowing waste bins near the college entrance are causing unmanaged waste accumulation."]**
+**[Select Category: Waste | Location: College Entrance]**
 **[Click: Submit Sustainability Report]**
 
-"Report submitted. We're taken directly to its detail page."
+"Our report is created, assigned ID #1, set to status `Submitted`, and redirected to the detail page."
 
 ---
 
-### 1:00 — Photo Evidence (1:00–1:15)
+### 0:50 — Running Autonomous ReAct AI Agent (0:50-[1:25])
 
-**[Show the evidence section on the report detail page]**
+**[On report detail page, click: Run AI Agent Analysis]**
 
-"The photo is stored and served securely. Notice how it's labelled 'User-Provided Photo Evidence' — clearly separate from AI interpretation."
+"Now watch our autonomous ReAct AI Agent (`agent_service.py`) run. The agent dynamically evaluates report context and selects specialized tools:
+- `get_report`: Reads report description and location
+- `retrieve_knowledge`: Queries our vector index (`SentenceTransformer` + `FAISS`)
+- `get_report_history`: Reviews past lifecycle status transitions
+- `get_dashboard_stats`: Checks campus-wide community context"
 
----
+**[Show Agent Activity Log & Knowledge Used]**
 
-### 1:15 — Running RAG AI Analysis (1:15–1:40)
-
-**[Click: Run AI Analysis button]**
-
-"Now I'll trigger AI analysis. In the background, our local RAG vector retrieval engine (`rag_service.py`) searches our knowledge base, finds matching chunks, and passes them into the AI grounding prompt."
-
-**[Analysis results appear]**
-
-"Look at what we get:
-- AI Priority Score: 8 out of 10 — High
-- AI Confidence: 85%
-- Probable Root Cause: Insufficient waste collection frequency
-- Recommended Action: Increase collection frequency & install 3-bin source segregation units
-- Knowledge Used: `waste-management.md` (92% Match) & `sdg11.md` (67% Match)
-- What is RAG explanation panel"
-
-"The 'Knowledge Used' section shows exact document sources, match percentages, and retrieved excerpts — complete transparency!"
+"Under **Knowledge Used**, notice how RAG retrieves evidence from `campus-survey.md` labelled **📋 Campus Survey Evidence**, alongside general guidance from `waste-management.md` and `sdg11.md` with exact relevance percentages and excerpts."
 
 ---
 
-### 1:40 — Status Lifecycle Tracking (1:40–2:15)
+### 1:25 — Grounded AI Analysis Output (1:25–1:55)
 
-**[Show status timeline: Submitted → Under Review → Action Planned → In Progress → Resolved → Verified]**
+**[Point to AI Analysis cards]**
 
-"AI assists decision-making — it does not make operational decisions. Only a human can update status.
-
-Let's transition this report:
-Submitted → Under Review → Action Planned → In Progress → Resolved → Verified."
-
-**[Select statuses and show real-time history log]**
-
----
-
-### 2:15 — Impact Dashboard & Responsible AI (2:15–2:55)
-
-**[Navigate to: Impact Dashboard]**
-
-"The Impact Dashboard shows real data from the database — no fabricated numbers. We track active vs resolved issues and distribution across categories."
-
-**[Scroll to Responsible AI section]**
-
-"Our Responsible AI safeguards include:
-- Grounded RAG Retrieval
-- Transparent Source Attribution
-- Human Oversight Required
-- Confidence & Low-Knowledge Warnings
-- Privacy & Honest Labelling"
+"The agent synthesizes the evidence and outputs:
+- **AI-Assisted Priority**: 8/10 (High)
+- **AI Confidence**: 85%
+- **Probable Root Cause**: Insufficient collection frequency during peak hours based on campus survey evidence.
+- **Recommended Action**: Implement 3-bin source segregation units and schedule twice-daily collection.
+- **Impact Estimate**: Qualitative estimate highlighting reduced litter and improved hygiene."
 
 ---
 
-### 2:55 — Closing (2:55–3:00)
+### 1:55 — Admin & Reviewer Panel & Human-in-the-Loop (1:55–2:35)
 
-**[Return to home page]**
+**[Navigate to http://localhost:3000/admin]**
 
-"AI Sustainability Discovery turns informal observations into grounded, transparent, AI-assisted action — supporting SDG 11: Sustainable Cities and Communities.
+"Now we switch to the Admin & Reviewer Panel. The AI never changes report status automatically — human reviewers maintain full operational decision control.
 
-Thank you."
+Here in the Admin Panel:
+- Real-time statistics show total, submitted, under review, in progress, resolved, verified, and high priority counts.
+- Category distribution bar lets us filter by issue type.
+- Interactive report registry table supports searching and status/priority filtering."
+
+**[Click: Update Status on Report #1]**
+
+"We transition status step-by-step:
+`Submitted` → `Under Review` → `Action Planned` → `In Progress` → `Resolved` → `Verified`
+And add an inspector note: *'Sanitation team notified for inspection.'*"
+
+**[Show Status History Timeline with note]**
+
+---
+
+### 2:35 — Impact Dashboard & Responsible AI (2:35–3:00)
+
+**[Navigate to http://localhost:3000/dashboard]**
+
+"Finally, our Impact Dashboard displays real-time metrics pulled directly from SQLite database records — no fake numbers.
+
+Our Responsible AI safeguards ensure:
+1. Human oversight required for operational status transitions.
+2. Campus survey observations clearly labelled as respondent-reported evidence.
+3. Transparent confidence ratings and qualitative impact estimates.
+
+AI Sustainability Discovery transforms informal observations into grounded, actionable, and verified sustainability impact — aligned with UN SDG 11."

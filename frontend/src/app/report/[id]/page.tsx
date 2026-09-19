@@ -21,6 +21,9 @@ import {
   BookOpen,
   FileText,
   Info,
+  Bot,
+  Wrench,
+  ListChecks,
 } from "lucide-react";
 
 const API_URL =
@@ -59,6 +62,38 @@ type Analysis = {
   retrieved_sources?: RetrievedSource[] | string | null;
   created_at: string;
 };
+
+type AgentToolResult = {
+  tool: string;
+  status: string;
+  result_summary: string;
+};
+
+type AgentAnalysis = Analysis & {
+  agent_selected_tools?: string[] | string | null;
+  agent_reasoning?: string | null;
+  agent_tool_results?: AgentToolResult[] | string | null;
+};
+
+// Friendly display names for agent tools
+const TOOL_LABELS: Record<string, { label: string; icon: string }> = {
+  get_report:          { label: "Read Report Information",          icon: "📄" },
+  retrieve_knowledge:  { label: "Retrieved Sustainability Knowledge", icon: "📚" },
+  get_report_history:  { label: "Reviewed Report Status History",    icon: "🕐" },
+  get_dashboard_stats: { label: "Checked Campus Community Statistics",icon: "📊" },
+};
+
+function parseAgentTools(v: string[] | string | null | undefined): string[] {
+  if (!v) return [];
+  if (Array.isArray(v)) return v;
+  try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; }
+}
+
+function parseAgentToolResults(v: AgentToolResult[] | string | null | undefined): AgentToolResult[] {
+  if (!v) return [];
+  if (Array.isArray(v)) return v;
+  try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; }
+}
 
 type HistoryEntry = {
   id: number;
@@ -163,6 +198,11 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
 
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState("");
+
+  // ─── Agent state ──────────────────────────────
+  const [agentAnalysis, setAgentAnalysis] = useState<AgentAnalysis | null>(null);
+  const [agentAnalyzing, setAgentAnalyzing] = useState(false);
+  const [agentError, setAgentError] = useState("");
 
   // ─── Data loading ─────────────────────────────
 
@@ -272,6 +312,36 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
       );
     } finally {
       setAnalyzing(false);
+    }
+  }
+
+  // ─── AI Agent Analysis ────────────────────────
+
+  async function handleAgentAnalyze() {
+    setAgentAnalyzing(true);
+    setAgentError("");
+
+    try {
+      const res = await fetch(`${API_URL}/api/reports/${id}/agent-analyze`, {
+        method: "POST",
+        cache: "no-store",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(
+          typeof data.detail === "string" ? data.detail : "Agent analysis failed."
+        );
+      }
+
+      setAgentAnalysis(data as AgentAnalysis);
+    } catch (err) {
+      setAgentError(
+        err instanceof Error ? err.message : "AI agent service unavailable."
+      );
+    } finally {
+      setAgentAnalyzing(false);
     }
   }
 
@@ -576,22 +646,45 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
               </div>
             </div>
 
-            <button
-              onClick={handleAnalyze}
-              disabled={analyzing}
-              className="flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-2.5 text-sm font-medium text-emerald-300 transition hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {analyzing ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Zap size={16} />
-              )}
-              {analyzing
-                ? "Analyzing…"
-                : analysis
-                ? "Re-run Analysis"
-                : "Run AI Analysis"}
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Existing RAG+AI analysis button */}
+              <button
+                id="btn-run-analysis"
+                onClick={handleAnalyze}
+                disabled={analyzing || agentAnalyzing}
+                className="flex items-center gap-2 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-2.5 text-sm font-medium text-emerald-300 transition hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {analyzing ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Zap size={16} />
+                )}
+                {analyzing
+                  ? "Analyzing…"
+                  : analysis
+                  ? "Re-run Analysis"
+                  : "Run AI Analysis"}
+              </button>
+
+              {/* New agentic AI analysis button */}
+              <button
+                id="btn-run-agent-analysis"
+                onClick={handleAgentAnalyze}
+                disabled={agentAnalyzing || analyzing}
+                className="flex items-center gap-2 rounded-xl border border-violet-400/30 bg-violet-400/10 px-4 py-2.5 text-sm font-medium text-violet-300 transition hover:bg-violet-400/20 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {agentAnalyzing ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Bot size={16} />
+                )}
+                {agentAnalyzing
+                  ? "Agent Running…"
+                  : agentAnalysis
+                  ? "Re-run AI Agent"
+                  : "Run AI Agent Analysis"}
+              </button>
+            </div>
           </div>
 
           {analyzeError && (
@@ -727,7 +820,7 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
               {/* ─ Knowledge Used (RAG Sources) ─ */}
               {retrievedSourcesList.length > 0 && (
                 <div className="rounded-xl border border-emerald-400/20 bg-emerald-400/5 p-5">
-                  <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+                  <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
                     <div className="flex items-center gap-2">
                       <BookOpen size={16} className="text-emerald-400" />
                       <p className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
@@ -740,27 +833,82 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                   </div>
 
                   <div className="space-y-3">
-                    {retrievedSourcesList.map((src, idx) => (
-                      <div key={idx} className="rounded-lg border border-white/10 bg-black/40 p-3.5 text-xs">
-                        <div className="flex items-center justify-between font-medium text-white/90">
-                          <span className="flex items-center gap-1.5 text-emerald-300">
-                            <FileText size={13} />
-                            {src.source}
-                            {src.title && <span className="text-white/40">({src.title})</span>}
-                          </span>
-                          {src.score !== undefined && (
-                            <span className="rounded-full bg-emerald-400/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-400">
-                              {Math.round(src.score * 100)}% Match
-                            </span>
+                    {retrievedSourcesList.map((src, idx) => {
+                      const isCampusSurvey = src.source === "campus-survey.md";
+                      const relevancePct = src.score !== undefined
+                        ? Math.round(src.score * 100)
+                        : null;
+                      // Show first ~280 chars of content as excerpt
+                      const excerpt = src.content
+                        ? src.content.replace(/^#+\s.*?\n/, "").trim().slice(0, 280)
+                        : null;
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`rounded-lg border p-3.5 text-xs ${
+                            isCampusSurvey
+                              ? "border-amber-400/25 bg-amber-400/5"
+                              : "border-white/10 bg-black/40"
+                          }`}
+                        >
+                          {/* Header row */}
+                          <div className="flex items-start justify-between gap-2 flex-wrap">
+                            <div className="flex items-center gap-1.5 font-medium">
+                              <span className="text-white/40 tabular-nums shrink-0">
+                                {idx + 1}.
+                              </span>
+                              <FileText
+                                size={13}
+                                className={isCampusSurvey ? "text-amber-400" : "text-emerald-300"}
+                              />
+                              <span className={isCampusSurvey ? "text-amber-300" : "text-emerald-300"}>
+                                {src.source}
+                              </span>
+                              {isCampusSurvey && (
+                                <span className="ml-1 rounded-full bg-amber-400/15 border border-amber-400/30 px-2 py-0.5 text-[10px] font-semibold text-amber-300 shrink-0">
+                                  📋 Campus Survey Evidence
+                                </span>
+                              )}
+                            </div>
+                            {relevancePct !== null && (
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-[11px] font-semibold shrink-0 ${
+                                  isCampusSurvey
+                                    ? "bg-amber-400/10 text-amber-400"
+                                    : "bg-emerald-400/10 text-emerald-400"
+                                }`}
+                              >
+                                Relevance: {relevancePct}%
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Section label */}
+                          {src.title && (
+                            <p className="mt-1.5 text-[11px] text-white/40">
+                              <span className="text-white/25">Section:</span>{" "}
+                              <span className="text-white/55">{src.title}</span>
+                            </p>
+                          )}
+
+                          {/* Evidence excerpt */}
+                          {excerpt && (
+                            <div className="mt-2">
+                              <p className="text-[10px] uppercase tracking-wider text-white/25 mb-1">
+                                Evidence:
+                              </p>
+                              <p className="text-white/55 leading-relaxed font-mono text-[11px] bg-white/[0.02] p-2 rounded border border-white/5 whitespace-pre-wrap line-clamp-4">
+                                {excerpt}
+                                {src.content && src.content.length > 280 && (
+                                  <span className="text-white/25"> …</span>
+                                )}
+                              </p>
+                            </div>
                           )}
                         </div>
-                        {src.content && (
-                          <p className="mt-2 text-white/60 line-clamp-3 leading-relaxed font-mono text-[11px] bg-white/[0.02] p-2 rounded border border-white/5 whitespace-pre-line">
-                            {src.content}
-                          </p>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -773,8 +921,10 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
                 </div>
                 <p className="text-white/60 leading-relaxed">
                   RAG retrieves relevant sustainability knowledge from the project&apos;s knowledge base before AI generates its analysis. This helps ground recommendations in documented project knowledge rather than relying only on the model&apos;s general knowledge.
+                  {" "}<span className="text-amber-300/70">Sources labelled <strong>Campus Survey Evidence</strong> contain observations reported by real campus survey respondents.</span>
                 </p>
               </div>
+
 
               {/* Model info */}
               {analysis.model_name && (
@@ -806,6 +956,245 @@ export default function ReportDetailPage({ params }: ReportDetailPageProps) {
             </strong>
           </div>
         </div>
+
+        {/* ─ AI Agent Analysis Card ─ */}
+        {(agentAnalysis || agentAnalyzing || agentError) && (
+          <div className="rounded-2xl border border-violet-400/20 bg-violet-400/[0.025] p-6 space-y-5">
+
+            {/* Header */}
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-400/10">
+                <Bot size={20} className="text-violet-400" />
+              </div>
+              <div>
+                <h2 className="font-semibold">🤖 AI Agent Analysis</h2>
+                <p className="text-xs text-white/35">Agentic AI with tool selection · RAG-grounded evidence</p>
+              </div>
+            </div>
+
+            {/* Loading state */}
+            {agentAnalyzing && (
+              <div className="flex items-center gap-3 rounded-xl border border-violet-400/20 bg-violet-400/5 p-4 text-sm text-violet-300">
+                <Loader2 size={16} className="animate-spin shrink-0" />
+                Agent is selecting tools and gathering evidence…
+              </div>
+            )}
+
+            {/* Error state */}
+            {agentError && (
+              <div className="flex items-start gap-2.5 rounded-xl border border-red-400/20 bg-red-400/5 p-4 text-sm text-red-300">
+                <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                {agentError}
+              </div>
+            )}
+
+            {agentAnalysis && (() => {
+              const selectedTools = parseAgentTools(agentAnalysis.agent_selected_tools);
+              const toolResults  = parseAgentToolResults(agentAnalysis.agent_tool_results);
+              const agentSources = parseSources(agentAnalysis.retrieved_sources);
+
+              return (
+                <>
+                  {/* Selected tools summary */}
+                  <div className="rounded-xl border border-violet-400/15 bg-violet-400/5 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <ListChecks size={14} className="text-violet-400" />
+                      <p className="text-xs font-semibold uppercase tracking-wider text-violet-400">Selected Tools</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedTools.map((tool) => (
+                        <span
+                          key={tool}
+                          className="flex items-center gap-1.5 rounded-full border border-violet-400/25 bg-violet-400/10 px-3 py-1 text-xs font-medium text-violet-300"
+                        >
+                          <span>{TOOL_LABELS[tool]?.icon ?? "🔧"}</span>
+                          {TOOL_LABELS[tool]?.label ?? tool}
+                        </span>
+                      ))}
+                    </div>
+                    {agentAnalysis.agent_reasoning && (
+                      <p className="mt-3 text-[11px] text-white/40 leading-relaxed border-t border-white/5 pt-3">
+                        <span className="text-white/25">Reasoning: </span>
+                        {agentAnalysis.agent_reasoning}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Agent Activity log */}
+                  {toolResults.length > 0 && (
+                    <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Wrench size={13} className="text-white/40" />
+                        <p className="text-xs font-semibold uppercase tracking-wider text-white/40">Agent Activity</p>
+                      </div>
+                      <ol className="space-y-2">
+                        {toolResults.map((tr, idx) => (
+                          <li key={idx} className="flex items-start gap-2.5 text-xs">
+                            <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-400/15 text-violet-400 font-semibold text-[10px]">
+                              {idx + 1}
+                            </span>
+                            <span className="flex-1">
+                              <span className="font-medium text-white/70">
+                                {TOOL_LABELS[tr.tool]?.icon ?? "🔧"}{" "}
+                                {TOOL_LABELS[tr.tool]?.label ?? tr.tool}
+                              </span>
+                              <span className="ml-2 text-white/35">{tr.result_summary}</span>
+                            </span>
+                            <span className={`shrink-0 text-[10px] font-medium ${
+                              tr.status === "success" ? "text-emerald-400" : "text-amber-400"
+                            }`}>
+                              {tr.status === "success" ? "✓" : "⚠"}
+                            </span>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+
+                  {/* Low confidence warning */}
+                  {agentAnalysis.confidence !== null && (agentAnalysis.confidence ?? 1) < 0.6 && (
+                    <div className="flex items-start gap-2.5 rounded-xl border border-amber-400/20 bg-amber-400/10 p-4 text-xs text-amber-300">
+                      <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                      <div>
+                        <span className="font-semibold">Limited supporting evidence was retrieved.</span>{" "}
+                        Human review recommended before operational action.
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Priority + Confidence */}
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-xl border border-white/10 bg-black/20 p-5">
+                      <p className="text-xs uppercase tracking-wider text-white/30">AI Priority Score</p>
+                      {agentAnalysis.priority_score !== null ? (() => {
+                        const { label, color } = getPriorityLabel(agentAnalysis.priority_score!);
+                        return (
+                          <div className="mt-3 flex items-end gap-3">
+                            <span className="text-3xl font-bold">{agentAnalysis.priority_score}</span>
+                            <span className="text-sm text-white/30">/10</span>
+                            <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${color}`}>{label}</span>
+                          </div>
+                        );
+                      })() : <p className="mt-3 text-white/30 text-sm">—</p>}
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-black/20 p-5">
+                      <p className="text-xs uppercase tracking-wider text-white/30">AI Confidence</p>
+                      {agentAnalysis.confidence !== null ? (
+                        <>
+                          <div className="mt-3 flex items-end gap-2">
+                            <span className="text-3xl font-bold">{Math.round((agentAnalysis.confidence ?? 0) * 100)}</span>
+                            <span className="text-sm text-white/30">%</span>
+                          </div>
+                          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                            <div
+                              className="h-full rounded-full bg-violet-400 transition-all"
+                              style={{ width: `${Math.round((agentAnalysis.confidence ?? 0) * 100)}%` }}
+                            />
+                          </div>
+                        </>
+                      ) : <p className="mt-3 text-white/30 text-sm">—</p>}
+                    </div>
+                  </div>
+
+                  {/* Root Cause, Action, Impact */}
+                  {["root_cause", "recommended_action", "impact_estimate"].map((field) => {
+                    const labels: Record<string, string> = {
+                      root_cause: "Probable Root Cause",
+                      recommended_action: "Recommended Action",
+                      impact_estimate: "Impact Estimate",
+                    };
+                    const val = agentAnalysis[field as keyof AgentAnalysis] as string | null;
+                    return val ? (
+                      <div key={field} className="rounded-xl border border-white/10 bg-black/20 p-5">
+                        <p className="text-xs uppercase tracking-wider text-white/30">{labels[field]}</p>
+                        <p className="mt-3 text-sm leading-relaxed text-white/80">{val}</p>
+                      </div>
+                    ) : null;
+                  })}
+
+                  {/* Agent Knowledge Used */}
+                  {agentSources.length > 0 && (
+                    <div className="rounded-xl border border-violet-400/20 bg-violet-400/5 p-5">
+                      <div className="flex items-center gap-2 mb-4">
+                        <BookOpen size={15} className="text-violet-400" />
+                        <p className="text-xs font-semibold uppercase tracking-wider text-violet-400">Knowledge Used</p>
+                        <span className="text-[11px] text-white/30 ml-auto">Agent-retrieved from knowledge base</span>
+                      </div>
+                      <div className="space-y-3">
+                        {agentSources.map((src, idx) => {
+                          const isCampus = src.source === "campus-survey.md";
+                          const relevancePct = src.score !== undefined ? Math.round(src.score * 100) : null;
+                          const excerpt = src.content
+                            ? src.content.replace(/^#+\s.*?\n/, "").trim().slice(0, 260)
+                            : null;
+                          return (
+                            <div
+                              key={idx}
+                              className={`rounded-lg border p-3.5 text-xs ${
+                                isCampus ? "border-amber-400/25 bg-amber-400/5" : "border-white/10 bg-black/40"
+                              }`}
+                            >
+                              <div className="flex items-start justify-between gap-2 flex-wrap">
+                                <div className="flex items-center gap-1.5 font-medium">
+                                  <span className="text-white/40 tabular-nums shrink-0">{idx + 1}.</span>
+                                  <FileText size={12} className={isCampus ? "text-amber-400" : "text-violet-300"} />
+                                  <span className={isCampus ? "text-amber-300" : "text-violet-300"}>{src.source}</span>
+                                  {isCampus && (
+                                    <span className="ml-1 rounded-full bg-amber-400/15 border border-amber-400/30 px-2 py-0.5 text-[10px] font-semibold text-amber-300 shrink-0">
+                                      📋 Campus Survey Evidence
+                                    </span>
+                                  )}
+                                </div>
+                                {relevancePct !== null && (
+                                  <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold shrink-0 ${
+                                    isCampus ? "bg-amber-400/10 text-amber-400" : "bg-violet-400/10 text-violet-400"
+                                  }`}>
+                                    Relevance: {relevancePct}%
+                                  </span>
+                                )}
+                              </div>
+                              {src.title && (
+                                <p className="mt-1.5 text-[11px] text-white/40">
+                                  <span className="text-white/25">Section: </span>
+                                  <span className="text-white/55">{src.title}</span>
+                                </p>
+                              )}
+                              {excerpt && (
+                                <div className="mt-2">
+                                  <p className="text-[10px] uppercase tracking-wider text-white/25 mb-1">Evidence:</p>
+                                  <p className="text-white/55 leading-relaxed font-mono text-[11px] bg-white/[0.02] p-2 rounded border border-white/5 whitespace-pre-wrap line-clamp-4">
+                                    {excerpt}{src.content && src.content.length > 260 && <span className="text-white/25"> …</span>}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Agent model info */}
+                  {agentAnalysis.model_name && (
+                    <div className="text-xs text-white/30 space-y-1">
+                      <p>Agent powered by: <span className="text-white/50">{agentAnalysis.model_name}</span> · {formatDate(agentAnalysis.created_at)}</p>
+                      {(agentAnalysis.model_name.includes("Fallback") || agentAnalysis.model_name.includes("Deterministic")) && (
+                        <p className="text-amber-400/70 text-[11px]">Running with deterministic fallback — configure GEMINI_API_KEY for live agentic AI.</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Responsible AI note */}
+                  <div className="rounded-xl border border-white/10 bg-black/20 p-4 text-xs leading-5 text-white/35">
+                    The agent selected tools based on report context, gathered evidence from the knowledge base,
+                    and generated a grounded analysis.{" "}
+                    <strong className="text-white/50">The agent cannot change report status — all operational decisions require human approval.</strong>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        )}
 
         {/* ─ Action Tracker ─ */}
         <div className="rounded-2xl border border-white/10 bg-white/[0.025] p-6">

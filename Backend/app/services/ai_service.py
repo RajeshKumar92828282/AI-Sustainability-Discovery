@@ -54,40 +54,74 @@ def _build_grounded_prompt(
 ) -> str:
     loc_part = f"Location: {location}" if location else "Location: Not specified"
 
-    if retrieved_sources:
-        context_blocks = []
-        source_names = []
-        for src in retrieved_sources:
-            context_blocks.append(f"--- SOURCE: {src['source']} ({src.get('title', '')}) ---\n{src['content']}")
-            source_names.append(src['source'])
-        context_text = "\n\n".join(context_blocks)
-        sources_text = ", ".join(source_names)
-    else:
-        context_text = "No direct knowledge base matches found."
-        sources_text = "None"
+    campus_survey_blocks = []
+    general_knowledge_blocks = []
+    source_names = []
 
-    return f"""SYSTEM:
-You are an expert AI Sustainability Analyst. Use the retrieved knowledge as supporting context.
-Do not invent unverified facts. If retrieved context does not support a claim, state uncertainty.
-Treat AI conclusions as recommendations, not absolute truth.
+    for src in retrieved_sources:
+        source_name = src['source']
+        title = src.get('title', '')
+        content = src.get('content', '')
+        score = src.get('score', 0.0)
+        block = f"--- SOURCE: {source_name} (Section: {title}, Relevance: {round(score * 100)}%) ---\n{content}"
+        if source_name == "campus-survey.md":
+            campus_survey_blocks.append(block)
+        else:
+            general_knowledge_blocks.append(block)
+        source_names.append(source_name)
+
+    if campus_survey_blocks:
+        campus_text = "\n\n".join(campus_survey_blocks)
+    else:
+        campus_text = "No campus survey evidence matched this query."
+
+    if general_knowledge_blocks:
+        general_text = "\n\n".join(general_knowledge_blocks)
+    else:
+        general_text = "No general sustainability guidance matched this query."
+
+    sources_text = ", ".join(source_names) if source_names else "None"
+
+    return f"""SYSTEM — RESPONSIBLE AI SUSTAINABILITY ANALYST:
+
+You are an AI Sustainability Analyst. Your role is to assist human reviewers by analysing
+sustainability reports. You must follow these grounding rules strictly:
+
+GROUNDING RULES:
+1. Use campus survey evidence (campus-survey.md) when it is relevant to the report — cite it as
+   evidence from campus survey respondents, not as verified operational fact.
+2. Use general sustainability knowledge documents to provide SDG context and mitigation strategies.
+3. Do NOT invent survey statistics or claim numeric measurements that are not in the retrieved sources.
+4. Do NOT claim a problem exists across the entire campus based on a single observation.
+5. Clearly distinguish: (A) campus survey evidence, (B) general sustainability guidance, (C) your AI inference.
+6. If retrieved evidence is weak or not directly relevant, say so and lower your confidence score.
+7. Treat priority_score and confidence as AI-assisted estimates, not objective measurements.
+8. Human reviewers remain responsible for all operational decisions.
 
 USER REPORT:
 - Category: {category}
 - {loc_part}
 - Description: {description}
 
-RETRIEVED SUSTAINABILITY KNOWLEDGE:
-{context_text}
+A. CAMPUS SURVEY EVIDENCE (from campus-survey.md — respondent-reported observations):
+{campus_text}
 
-SOURCE DOCUMENTS:
-{sources_text}
+B. GENERAL SUSTAINABILITY KNOWLEDGE (SDG guidance, best practices):
+{general_text}
+
+SOURCE DOCUMENTS USED: {sources_text}
+
+Using the above context, generate a structured analysis. In root_cause, reference campus survey
+evidence only if it is genuinely relevant. In recommended_action, combine campus-specific
+observations with general best practice. In impact_estimate, keep qualitative — do not cite
+numbers not present in the retrieved sources.
 
 Respond ONLY with a valid JSON object matching this schema (no markdown fences, no explanation):
 {{
   "category": "{category}",
   "priority_score": <integer between 1 and 10>,
   "confidence": <float between 0.0 and 1.0>,
-  "root_cause": "<probable root cause in 1-2 sentences>",
+  "root_cause": "<probable root cause grounded in evidence; note if campus survey evidence is relevant>",
   "recommended_action": "<specific actionable recommendation in 1-2 sentences>",
   "impact_estimate": "<estimated qualitative environmental impact>"
 }}"""
@@ -345,10 +379,18 @@ def analyze_report(
     4. Calls watsonx if WATSONX_API_KEY is configured.
     5. Falls back to structured RAG simulation.
     """
-    # Step 1: Perform RAG retrieval
-    query_text = f"{category}: {description}"
-    retrieved_sources = retrieve_context(query_text, top_k=3)
-    logger.info(f"RAG retrieved {len(retrieved_sources)} sources for report query.")
+    # Step 1: Perform RAG retrieval — build query from category + location + description
+    location_part = f" at {location}" if location else ""
+    query_text = f"{category}{location_part}: {description}"
+    retrieved_sources = retrieve_context(query_text, top_k=5)
+    # Deduplicate: keep best score per source file, then take top 3
+    seen_sources: dict = {}
+    for src in retrieved_sources:
+        src_name = src["source"]
+        if src_name not in seen_sources or src["score"] > seen_sources[src_name]["score"]:
+            seen_sources[src_name] = src
+    retrieved_sources = sorted(seen_sources.values(), key=lambda x: x["score"], reverse=True)[:3]
+    logger.info(f"RAG retrieved {len(retrieved_sources)} deduplicated sources for report query: '{query_text[:80]}'")
 
     # Step 2: Check Gemini API Key
     gemini_key = os.getenv("GEMINI_API_KEY", "").strip()

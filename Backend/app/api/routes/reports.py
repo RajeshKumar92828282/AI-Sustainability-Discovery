@@ -20,8 +20,10 @@ from app.services.report_service import (
     get_dashboard_stats,
 )
 from app.services.ai_service import analyze_report
+from app.services.agent_service import run_sustainability_agent
 
 logger = logging.getLogger(__name__)
+
 
 router = APIRouter(prefix="/api/reports", tags=["Reports"])
 
@@ -224,5 +226,70 @@ def get_analysis(report_id: int, db: Session = Depends(get_db)):
     analysis = db.query(ReportAnalysis).filter(ReportAnalysis.report_id == report_id).first()
     if analysis is None:
         raise HTTPException(status_code=404, detail="No AI analysis found for this report. Run analysis first.")
+
+    return analysis
+
+
+# ──────────────────────────────────────────────
+# AI Agent Analysis
+# ──────────────────────────────────────────────
+
+@router.post("/{report_id}/agent-analyze", response_model=ReportAnalysisResponse)
+def run_agent_analysis(report_id: int, db: Session = Depends(get_db)):
+    """
+    Run Agentic AI analysis on a sustainability report.
+
+    The agent:
+    1. Decides which tools to use (get_report, retrieve_knowledge,
+       get_report_history, get_dashboard_stats) based on the report context.
+    2. Executes only the selected tools.
+    3. Builds a grounded prompt from collected evidence.
+    4. Calls the configured AI provider (Gemini → watsonx → deterministic fallback).
+    5. Saves analysis + agent metadata in report_analysis table.
+
+    The agent NEVER changes report status — human reviewers control all transitions.
+    Existing /analyze endpoint is NOT affected.
+    """
+    report = get_report(db, report_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found.")
+
+    try:
+        agent_output = run_sustainability_agent(report_id=report_id, db=db)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        logger.error("Agent analysis failed for report %d: %s", report_id, exc)
+        raise HTTPException(
+            status_code=503,
+            detail="AI agent service is temporarily unavailable. Please try again.",
+        )
+
+    result = agent_output["analysis"]
+
+    # Upsert: delete existing analysis record and insert fresh one
+    existing = db.query(ReportAnalysis).filter(ReportAnalysis.report_id == report_id).first()
+    if existing:
+        db.delete(existing)
+        db.commit()
+
+    analysis = ReportAnalysis(
+        report_id=report_id,
+        category=result.category,
+        priority_score=result.priority_score,
+        confidence=result.confidence,
+        root_cause=result.root_cause,
+        recommended_action=result.recommended_action,
+        impact_estimate=result.impact_estimate,
+        model_name=result.model_name,
+        retrieved_sources=json.dumps(result.retrieved_sources) if result.retrieved_sources else None,
+        # Agent-specific fields
+        agent_selected_tools=json.dumps(agent_output["agent_selected_tools"]),
+        agent_reasoning=agent_output["agent_reasoning"],
+        agent_tool_results=json.dumps(agent_output["agent_tool_results"]),
+    )
+    db.add(analysis)
+    db.commit()
+    db.refresh(analysis)
 
     return analysis
