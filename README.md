@@ -50,6 +50,21 @@ $$\text{Discover} \longrightarrow \text{Understand (RAG \& Agent)} \longrightarr
    - Campus survey observations explicitly labelled as *respondent-reported evidence*, not verified operational facts.
    - Qualitative impact labelling without fabricated environmental savings.
 
+## 📚 Project Documentation
+
+Comprehensive documentation is available in the [`docs/`](file:///e:/ai-sustainability-discovery/docs/README.md) directory:
+
+- 🧭 [**Documentation Hub Index**](file:///e:/ai-sustainability-discovery/docs/README.md) — Master index of all docs
+- ⚡ [**API Documentation**](file:///e:/ai-sustainability-discovery/docs/api-documentation.md) — Endpoints, Schemas, cURL Examples, Error Codes
+- 🤖 [**AI & RAG Workflow Architecture**](file:///e:/ai-sustainability-discovery/docs/ai-workflow.md) — FAISS Index, ReAct Agent Tools, Fallback Pipeline
+- 🔍 [**Problem Discovery & SDG Alignment**](file:///e:/ai-sustainability-discovery/docs/problem-discovery.md) — Context, Campus Survey Evidence, SDG 11/6/7/12/13
+- ⚙️ [**Project Requirements & Specs**](file:///e:/ai-sustainability-discovery/docs/project-requirements.md) — Functional/Non-Functional Specs, DB Schema, Env Vars
+- 🛡️ [**Responsible AI Framework**](file:///e:/ai-sustainability-discovery/docs/responsible-ai.md) — Ethical principles, Human-in-the-loop governance
+- 📊 [**Impact Assessment**](file:///e:/ai-sustainability-discovery/docs/impact.md) — Prototype results & impact metrics
+- 🎬 [**Step-by-Step Demo Script**](file:///e:/ai-sustainability-discovery/docs/demo-script.md) — Interactive walkthrough guide
+- 📢 [**Presentation Outline**](file:///e:/ai-sustainability-discovery/docs/presentation-outline.md) — Pitch deck structure
+- 📝 [**Submission Summary**](file:///e:/ai-sustainability-discovery/docs/submission-content.md) — Formal submission details
+
 ---
 
 ## 🛠️ Tech Stack
